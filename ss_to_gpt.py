@@ -8,7 +8,6 @@ import sys
 import json
 import time
 import requests
-import re
 
 IGNORE = [".DS_Store"]
 SCREENSHOT_DIRECTORY = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -33,6 +32,9 @@ GPT_4O_SOLVE_PROMPT = "Solve the problem shown in the given image."
 
 
 def get_api_key(key_file, api_name, key_name):
+    """
+    Get a given API key from a JSON file
+    """
     try:
         with open(key_file, 'r') as file:
             data = json.load(file)
@@ -58,22 +60,21 @@ def default_payload(image_question):
         "model" : MODELS[0],
         "messages": [
             {
-            "role": "user",
-            "content": [
-                {
-                "type": "text",
-                "text": f"{image_question}"
-                },
-                {
-                "type": "image_url",
-                "image_url": {
-                    "url": ""
-                }
-                }
-            ]
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"{image_question}"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": ""
+                    }
+                    }
+                ]
             }
         ]
-        #"max_tokens": 100
     }
 
 
@@ -107,7 +108,6 @@ def send_image_and_prompt(api_key, img_path, prompt):
       """
       Send image to vision model with prompt
       """
-      #reduce_png_quality(img_path, img_path)
       base64_image = encode_image(img_path)
 
       start_time_req = time.perf_counter()
@@ -165,8 +165,7 @@ def clean_string(input_string):
     return input_string
 
 
-def solve_with_4o(img_paths, prompt, graphic=True):
-    # TODO: handle case of multiple images, graphic in one, all problems related to graphic
+def solve_with_4o(img_paths, prompt):
     if len(img_paths) > 1:
         raise NotImplementedError()
     else:
@@ -176,10 +175,20 @@ def solve_with_4o(img_paths, prompt, graphic=True):
             res = send_image_and_prompt(api_key, img_paths[0], prompt)
         else:
             res = send_image_and_prompt(api_key, img_paths[0], GPT_4O_SOLVE_PROMPT)
-        write_to_markdown(res)
+
+        if res:
+            write_to_markdown(res)
+        else:
+            print('error...invalid or no response')
 
 
 def solve_with_o1(img_paths, prompt):
+    """
+    Call functions to extract image text, send to LLM, and write response to markdown file
+
+    image_paths (list(str)): list of image paths to extract text from and send to LLM
+    prompt (str): Optional extra prompt to prepend image text with
+    """
     api_key = get_api_key(API_KEY_FILE, 'open-ai', 'default')
 
     problem = get_ss_text(img_paths)
@@ -187,7 +196,9 @@ def solve_with_o1(img_paths, prompt):
     if prompt:
         problem = prompt + f": '{problem}'"
     
+    print("********** PROMPT **********")
     print(problem)
+    print("****************************")
 
     res = send_prompt_o1(api_key, problem)
     if res:
@@ -247,9 +258,12 @@ def replace_latex_delimiters(input_file, output_file=None):
 
 
 if __name__ == "__main__":
-    # first arg for multiple files, defaults to 1
+    """
+    arg 1: Specify number of images to send. Defaults to 1
+    arg 2: Pass in '1' to prompt vision model instead of extracting text
+    arg 3: type '--prompt' to be prompted for input to include in the GPT prompt 
+    """
     num_files = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    # second arg, pass in 1 sent image to vision model instead of extracting text
     graphic_request = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 
     user_prompt = ""
@@ -263,7 +277,7 @@ if __name__ == "__main__":
         sys.exit()
 
     if graphic_request:
-        print("handling graphic")
+        print("handling graphic with 4o")
         solve_with_4o(sorted_files, user_prompt)
     else:
         print("handling text with o1")
