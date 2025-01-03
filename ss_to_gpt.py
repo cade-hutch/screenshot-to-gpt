@@ -165,21 +165,29 @@ def clean_string(input_string):
     return input_string
 
 
-def solve_with_4o(img_paths, graphic=True):
+def solve_with_4o(img_paths, prompt, graphic=True):
     # TODO: handle case of multiple images, graphic in one, all problems related to graphic
     if len(img_paths) > 1:
         raise NotImplementedError()
     else:
         api_key = get_api_key(API_KEY_FILE, 'open-ai', 'default')
 
-        res = send_image_and_prompt(api_key, img_paths[0], GPT_4O_SOLVE_PROMPT)
+        if prompt:
+            res = send_image_and_prompt(api_key, img_paths[0], prompt)
+        else:
+            res = send_image_and_prompt(api_key, img_paths[0], GPT_4O_SOLVE_PROMPT)
         write_to_markdown(res)
 
 
-def solve_with_o1(img_paths):
+def solve_with_o1(img_paths, prompt):
     api_key = get_api_key(API_KEY_FILE, 'open-ai', 'default')
 
     problem = get_ss_text(img_paths)
+
+    if prompt:
+        problem = prompt + f": '{problem}'"
+    
+    print(problem)
 
     res = send_prompt_o1(api_key, problem)
     if res:
@@ -244,6 +252,10 @@ if __name__ == "__main__":
     # second arg, pass in 1 sent image to vision model instead of extracting text
     graphic_request = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 
+    user_prompt = ""
+    if "--prompt" in sys.argv:
+        user_prompt = input("Enter prompt to send with image(s):")
+
     try:
         sorted_files = list(reversed(get_files_by_last_modified(SCREENSHOT_DIRECTORY, num_files)))
     except Exception as e:
@@ -252,8 +264,8 @@ if __name__ == "__main__":
 
     if graphic_request:
         print("handling graphic")
-        solve_with_4o(sorted_files)
+        solve_with_4o(sorted_files, user_prompt)
     else:
         print("handling text with o1")
-        solve_with_o1(sorted_files)
+        solve_with_o1(sorted_files, user_prompt)
     
